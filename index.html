@@ -1,0 +1,69 @@
+﻿<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MovieSearch</title>
+    <link rel="stylesheet" href="./src/css/styles.css" />
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  </head>
+  <body>
+    <header class="header">
+      <h1 class="header--title">MovieSearch</h1>
+    </header>
+    <main class="main">
+      <div class="search--container wrapper">
+        <div class="search">
+          <div class="search--img">
+            <img
+              class="search--loading"
+              alt="loading..."
+              title="loading..."
+              src="./assets/ico/load.gif"
+            />
+          </div>
+          <div class="search--input_container">
+            <input
+              class="search--input"
+              type="text"
+              name=""
+              id=""
+              placeholder="Search movie"
+              autocomplete="off"
+              autofocus
+            />
+            <button class="search--clear_button hidden"></button>
+          </div>
+          <button class="search--mic_button"></button>
+          <button class="search--keyboard_button"></button>
+          <button class="button search--submit_button">Search</button>
+        </div>
+        <div class="keyboard--container keyboard--container-hidden"></div>
+      </div>
+      <div class="notification"></div>
+      <div class="slider--container">
+        <div class="slider">
+          <div class="slider--content">
+            <div class="cards_container"></div>
+          </div>
+          <div class="slider--left hidden"></div>
+          <div class="slider--right hidden"></div>
+        </div>
+        <progress class="slider--progress"></progress>
+      </div>
+    </main>
+    <footer class="footer">
+      <div class="footer--links wrapper">
+        <div>
+          <a class="footer--a" href="https://docs.rs.school/"
+            >RS School 2020q1</a
+          >
+        </div>
+        <div>
+          <a class="footer--a" href="https://github.com/KrohNic">My Github</a>
+        </div>
+      </div>
+    </footer>
+    <script type="module" src="./dist/script.js"></script>
+  </body>
+</html>
