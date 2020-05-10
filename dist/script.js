@@ -105,9 +105,6 @@ var Slider = __webpack_require__(/*! ./Slider */ "./src/Slider.js");
 
 var Search = __webpack_require__(/*! ./Search */ "./src/Search.js");
 
-var _require = __webpack_require__(/*! ./values */ "./src/values.js"),
-    DEFAULT_SEARCH_STR = _require.DEFAULT_SEARCH_STR;
-
 var KeyboardApp = __webpack_require__(/*! ./KeyboardApp */ "./src/KeyboardApp.js");
 
 var Speech = __webpack_require__(/*! ./Speech */ "./src/Speech.js");
@@ -123,7 +120,7 @@ var App = /*#__PURE__*/function () {
     this.speechInst = new Speech(this);
     this.isLoading = false;
     this.page = 1;
-    this.searchStr = DEFAULT_SEARCH_STR;
+    this.searchStr = '';
   }
 
   _createClass(App, [{
@@ -137,11 +134,15 @@ var App = /*#__PURE__*/function () {
       }
 
       this.isLoading = true;
-      if (searchStr) this.searchStr = searchStr;
 
       var searchCallback = function searchCallback(dataObj) {
-        var errorMsg = dataObj.error || null;
-        if (dataObj.data) _this.sliderInst.setData(dataObj.data, dataObj.total);
+        var errorMsg = dataObj.error || false;
+
+        if (dataObj.data) {
+          _this.sliderInst.setData(dataObj.data, dataObj.total);
+
+          _this.searchStr = searchStr;
+        }
 
         _this.searchInst.searchingEndHandler(errorMsg);
 
@@ -149,7 +150,7 @@ var App = /*#__PURE__*/function () {
         _this.page = 1;
       };
 
-      Fetcher.fetchMovieData(this.searchStr, searchCallback);
+      if (searchStr) Fetcher.fetchMovieData(searchStr, searchCallback);
     }
   }, {
     key: "loadNextPage",
@@ -217,12 +218,11 @@ var Cards = /*#__PURE__*/function () {
     this.sliderInst = sliderInst;
     this.parent = parentElem;
     this.data = null;
-    this.isCardContainerVisible = true;
+    this.isCardContainerVisible = false;
+    this.firstCardsLoadedIndicatorList = [];
     this.parent.addEventListener('transitionend', function (event) {
       if (event.target !== _this.parent) return;
       if (_this.isCardContainerVisible) return;
-
-      _this.revealCardsContainer();
 
       _this.replaceCards();
     });
@@ -241,16 +241,31 @@ var Cards = /*#__PURE__*/function () {
       this.parent.classList.remove('transparent');
     }
   }, {
+    key: "replaceCards",
+    value: function replaceCards() {
+      this.parent.textContent = '';
+      this.createCards(this.data);
+      this.sliderInst.contentReplaceHandler();
+    }
+  }, {
     key: "reveal",
-    value: function reveal(card) {
-      if (!this.isCardContainerVisible) return;
+    value: function reveal(card, index) {
       if (card.classList.contains('noimg')) return;
       if (card.classList.contains('norating')) return;
+
+      if (!this.isCardContainerVisible) {
+        this.firstCardsLoadedIndicatorList[index] = true;
+        var isCardsFullyLoaded = this.firstCardsLoadedIndicatorList.every(function (item) {
+          return item;
+        });
+        if (isCardsFullyLoaded) this.revealCardsContainer();
+      }
+
       card.classList.remove('transparent');
     }
   }, {
     key: "createRatingElements",
-    value: function createRatingElements(parentElem, rating, card) {
+    value: function createRatingElements(parentElem, rating, card, cardIndex) {
       var parent = parentElem;
       parent.textContent = '';
       var img = Utils.createElem('img', 'rating--star', parentElem);
@@ -258,22 +273,22 @@ var Cards = /*#__PURE__*/function () {
       img.src = './assets/ico/star.svg';
       Utils.createElem('div', 'rating--text', parentElem, rating);
       card.classList.remove('norating');
-      this.reveal(card);
+      this.reveal(card, cardIndex);
     }
   }, {
     key: "getImdbRating",
-    value: function getImdbRating(id, parentElem, card) {
+    value: function getImdbRating(id, parentElem, card, cardIndex) {
       var _this2 = this;
 
       var callback = function callback(rating) {
-        _this2.createRatingElements(parentElem, rating, card);
+        _this2.createRatingElements(parentElem, rating, card, cardIndex);
       };
 
       Fetcher.fetchImdbRating(id, callback);
     }
   }, {
     key: "loadPoster",
-    value: function loadPoster(card, imgContainer, data) {
+    value: function loadPoster(card, imgContainer, data, cardIndex) {
       var _this3 = this;
 
       var img = Utils.createElem('img', 'card--img', imgContainer);
@@ -282,25 +297,23 @@ var Cards = /*#__PURE__*/function () {
       img.addEventListener('load', function () {
         card.classList.remove('noimg');
 
-        _this3.reveal(card);
+        _this3.reveal(card, cardIndex);
       });
       img.addEventListener('error', function () {
-        _this3.setEmptyPoster(imgContainer, card);
-
-        return false;
+        _this3.setEmptyPoster(imgContainer, card, cardIndex);
       });
     }
   }, {
     key: "setEmptyPoster",
-    value: function setEmptyPoster(imgContainer, card) {
+    value: function setEmptyPoster(imgContainer, card, cardIndex) {
       var container = imgContainer;
       container.textContent = POSTER_NA;
       card.classList.remove('noimg');
-      this.reveal(card);
+      this.reveal(card, cardIndex);
     }
   }, {
     key: "getNewCard",
-    value: function getNewCard(data) {
+    value: function getNewCard(data, cardIndex) {
       var card = Utils.createElem('div', 'card transparent noimg norating');
       var title = Utils.createElem('a', 'card--title', card, data.Title);
       title.title = data.Title;
@@ -308,15 +321,15 @@ var Cards = /*#__PURE__*/function () {
       var imgContainer = Utils.createElem('div', 'card--img_container', card);
 
       if (data.Poster !== 'N/A') {
-        this.loadPoster(card, imgContainer, data);
+        this.loadPoster(card, imgContainer, data, cardIndex);
       } else {
-        this.setEmptyPoster(imgContainer, card);
+        this.setEmptyPoster(imgContainer, card, cardIndex);
       }
 
       Utils.createElem('div', 'card--year', card, data.Year);
       var rating = Utils.createElem('div', 'card--rating', card, data.imdbId);
       Utils.createLoadingPlaceholder(rating);
-      this.getImdbRating(data.imdbID, rating, card);
+      this.getImdbRating(data.imdbID, rating, card, cardIndex);
       return card;
     }
   }, {
@@ -325,30 +338,19 @@ var Cards = /*#__PURE__*/function () {
       var _this4 = this;
 
       var fragment = new DocumentFragment();
-      data.forEach(function (movie) {
-        var card = _this4.getNewCard(movie);
+      data.forEach(function (movie, cardIndex) {
+        var card = _this4.getNewCard(movie, cardIndex);
 
         fragment.append(card);
       });
       this.parent.append(fragment);
     }
   }, {
-    key: "replaceCards",
-    value: function replaceCards() {
-      var _this5 = this;
-
-      this.parent.textContent = '';
-      this.createCards(this.data);
-      this.sliderInst.contentReplaceHandler();
-      Array.from(this.parent.children).forEach(function (card) {
-        _this5.reveal(card);
-      });
-    }
-  }, {
     key: "setData",
     value: function setData(data) {
       if (!data) return;
       this.data = data;
+      this.firstCardsLoadedIndicatorList = new Array(data.length).fill(false);
       if (this.parent.children.length) this.hideOldCardsRevealNew();else this.replaceCards();
     }
   }, {
@@ -948,16 +950,6 @@ var KeyboardApp = /*#__PURE__*/function () {
 
         _this.area.focus();
       });
-      document.addEventListener('keydown', function (e) {
-        _this.board.handleKeyDown(e);
-
-        _this.updateClearBtnState();
-      });
-      document.addEventListener('keyup', function (e) {
-        _this.board.handleKeyUp(e);
-
-        _this.updateClearBtnState();
-      });
     }
   }, {
     key: "updateClearBtnState",
@@ -1312,7 +1304,7 @@ var Slider = /*#__PURE__*/function () {
   }, {
     key: "updateProgress",
     value: function updateProgress() {
-      var cardsDisplaying = this.sliderContentWidth / this.cardWidth;
+      var cardsDisplaying = Math.round(this.sliderContentWidth / this.cardWidth);
       this.progressElem.value = this.firstCardIndex + cardsDisplaying;
     }
   }, {
@@ -1504,13 +1496,14 @@ module.exports = Utils;
 
 var App = __webpack_require__(/*! ./App */ "./src/App.js");
 
+var _require = __webpack_require__(/*! ./values */ "./src/values.js"),
+    DEFAULT_SEARCH_STR = _require.DEFAULT_SEARCH_STR;
+
 document.body.onload = function () {
   var app = new App();
-  app.loadNewCards(); // eslint-disable-next-line no-alert
+  app.loadNewCards(DEFAULT_SEARCH_STR); // eslint-disable-next-line no-alert
 
-  window.alert('Доп. функция - Голосовой поиск (кнопка микрофона в строке ' + 'поиска)\nПри ожидании ответа от сервера присутствует индикация ' + 'процесса загрузки - появляется в строке поиска на месте лупы\n' + 'По вопросам пишите - mikolka.del@gmail.com'); // клава комбинации и выделение
-  // показ 4 катрочек вместе
-  // клава работае только с мышью
+  window.alert('Доп. функция - Голосовой поиск (кнопка микрофона в строке ' + 'поиска)\nПри ожидании ответа от сервера присутствует индикация ' + 'процесса загрузки - появляется в строке поиска на месте лупы\n' + 'По вопросам пишите - mikolka.del@gmail.com');
 };
 
 /***/ }),

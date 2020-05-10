@@ -45,16 +45,6 @@ class KeyboardApp {
       this.clearBtn.classList.add('hidden');
       this.area.focus();
     });
-
-    document.addEventListener('keydown', (e) => {
-      this.board.handleKeyDown(e);
-      this.updateClearBtnState();
-    });
-
-    document.addEventListener('keyup', (e) => {
-      this.board.handleKeyUp(e);
-      this.updateClearBtnState();
-    });
   }
 
   updateClearBtnState() {

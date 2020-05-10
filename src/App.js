@@ -1,7 +1,6 @@
 const Fetcher = require('./Fetcher');
 const Slider = require('./Slider');
 const Search = require('./Search');
-const { DEFAULT_SEARCH_STR } = require('./values');
 const KeyboardApp = require('./KeyboardApp');
 const Speech = require('./Speech');
 
@@ -15,7 +14,7 @@ class App {
 
     this.isLoading = false;
     this.page = 1;
-    this.searchStr = DEFAULT_SEARCH_STR;
+    this.searchStr = '';
   }
 
   loadNewCards(searchStr) {
@@ -26,19 +25,20 @@ class App {
 
     this.isLoading = true;
 
-    if (searchStr) this.searchStr = searchStr;
-
     const searchCallback = (dataObj) => {
-      const errorMsg = dataObj.error || null;
+      const errorMsg = dataObj.error || false;
 
-      if (dataObj.data) this.sliderInst.setData(dataObj.data, dataObj.total);
+      if (dataObj.data) {
+        this.sliderInst.setData(dataObj.data, dataObj.total);
+        this.searchStr = searchStr;
+      }
 
       this.searchInst.searchingEndHandler(errorMsg);
       this.isLoading = false;
       this.page = 1;
     };
 
-    Fetcher.fetchMovieData(this.searchStr, searchCallback);
+    if (searchStr) Fetcher.fetchMovieData(searchStr, searchCallback);
   }
 
   loadNextPage() {

@@ -219,7 +219,9 @@ class Slider {
   }
 
   updateProgress() {
-    const cardsDisplaying = this.sliderContentWidth / this.cardWidth;
+    const cardsDisplaying = Math.round(
+      this.sliderContentWidth / this.cardWidth,
+    );
     this.progressElem.value = this.firstCardIndex + cardsDisplaying;
   }
 

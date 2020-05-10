@@ -1,8 +1,9 @@
 const App = require('./App');
+const { DEFAULT_SEARCH_STR } = require('./values');
 
 document.body.onload = () => {
   const app = new App();
-  app.loadNewCards();
+  app.loadNewCards(DEFAULT_SEARCH_STR);
 
   // eslint-disable-next-line no-alert
   window.alert(
@@ -11,8 +12,4 @@ document.body.onload = () => {
       + 'процесса загрузки - появляется в строке поиска на месте лупы\n'
       + 'По вопросам пишите - mikolka.del@gmail.com',
   );
-
-  // клава комбинации и выделение
-  // показ 4 катрочек вместе
-  // клава работае только с мышью
 };
