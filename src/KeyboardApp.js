@@ -41,7 +41,6 @@ class KeyboardApp {
 
     this.clearBtn.addEventListener('click', () => {
       this.area.value = '';
-      this.board.cursorPosition = 0;
       this.clearBtn.classList.add('hidden');
       this.area.focus();
     });

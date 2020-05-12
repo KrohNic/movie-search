@@ -44,9 +44,95 @@ class Key {
     return fragment;
   }
 
+  backspace() {
+    if (this.area.selectionStart === this.area.selectionEnd) {
+      if (this.area.selectionStart <= 0) return;
+
+      this.area.setRangeText(
+        '',
+        this.area.selectionStart - 1,
+        this.area.selectionStart,
+        'end',
+      );
+    } else {
+      this.printText('');
+    }
+  }
+
+  printText(text) {
+    this.area.setRangeText(
+      text,
+      this.area.selectionStart,
+      this.area.selectionEnd,
+      'end',
+    );
+  }
+
+  moveCursorLeft(ShiftLeft) {
+    if (ShiftLeft.classList.contains('button_active')) {
+      if (
+        this.area.selectionStart !== this.area.selectionEnd
+        && this.area.selectionDirection === 'forward'
+      ) {
+        this.area.setSelectionRange(
+          this.area.selectionStart,
+          this.area.selectionEnd - 1,
+          'forward',
+        );
+      } else if (this.area.selectionStart > 0) {
+        this.area.setSelectionRange(
+          this.area.selectionStart - 1,
+          this.area.selectionEnd,
+          'backward',
+        );
+      }
+    } else if (this.area.selectionStart === 0) {
+      this.area.setSelectionRange(
+        this.area.selectionStart,
+        this.area.selectionStart,
+      );
+    } else {
+      this.area.setSelectionRange(
+        this.area.selectionStart - 1,
+        this.area.selectionStart - 1,
+      );
+    }
+  }
+
+  moveCursorRight(ShiftLeft) {
+    if (ShiftLeft.classList.contains('button_active')) {
+      if (
+        this.area.selectionStart === this.area.selectionEnd
+        || this.area.selectionDirection === 'forward'
+      ) {
+        this.area.setSelectionRange(
+          this.area.selectionStart,
+          this.area.selectionEnd + 1,
+          'forward',
+        );
+      } else {
+        this.area.setSelectionRange(
+          this.area.selectionStart + 1,
+          this.area.selectionEnd,
+          'backward',
+        );
+      }
+    } else if (this.area.value.length === this.area.selectionEnd) {
+      this.area.setSelectionRange(
+        this.area.selectionEnd,
+        this.area.selectionEnd,
+      );
+    } else {
+      this.area.setSelectionRange(
+        this.area.selectionEnd + 1,
+        this.area.selectionEnd + 1,
+      );
+    }
+  }
+
   repeatKey(fn, keyValue) {
     const keyRepeatInterval = 175;
-    this.keyboardInst.cursorPosition = this.area.selectionStart;
+
     fn(keyValue);
     this.interval = setInterval(fn, keyRepeatInterval, keyValue);
   }
@@ -60,34 +146,15 @@ class Key {
     switch (event.target.id) {
       case 'Backspace':
         this.repeatKey(() => {
-          if (this.keyboardInst.cursorPosition <= 0) return;
-
-          this.area.setRangeText(
-            '',
-            this.keyboardInst.cursorPosition - 1,
-            this.keyboardInst.cursorPosition,
-            'end',
-          );
+          this.backspace();
         });
         break;
       case 'Space':
-        this.repeatKey(() => {
-          this.area.setRangeText(
-            ' ',
-            this.keyboardInst.cursorPosition,
-            this.keyboardInst.cursorPosition,
-            'end',
-          );
-        });
+        this.printText(' ');
         break;
       case 'Tab':
         this.repeatKey(() => {
-          this.area.setRangeText(
-            '    ',
-            this.keyboardInst.cursorPosition,
-            this.keyboardInst.cursorPosition,
-            'end',
-          );
+          this.printText('    ');
         });
         break;
       case 'Enter':
@@ -129,34 +196,17 @@ class Key {
         break;
       case 'ArrowLeft':
         this.repeatKey(() => {
-          if (this.keyboardInst.cursorPosition <= 0) return;
-
-          this.area.setSelectionRange(
-            this.keyboardInst.cursorPosition - 1,
-            this.keyboardInst.cursorPosition - 1,
-          );
+          this.moveCursorLeft(ShiftLeft);
         });
         break;
       case 'ArrowRight':
         this.repeatKey(() => {
-          if (this.area.value.length <= this.keyboardInst.cursorPosition) {
-            return;
-          }
-
-          this.area.setSelectionRange(
-            this.keyboardInst.cursorPosition + 1,
-            this.keyboardInst.cursorPosition + 1,
-          );
+          this.moveCursorRight(ShiftLeft);
         });
         break;
       default:
         this.repeatKey((text) => {
-          this.area.setRangeText(
-            text,
-            this.keyboardInst.cursorPosition,
-            this.keyboardInst.cursorPosition,
-            'end',
-          );
+          this.printText(text);
         }, event.target.textContent);
         break;
     }
@@ -165,6 +215,7 @@ class Key {
   keyUp() {
     clearInterval(this.interval);
     this.keyboardInst.keyboardAppInst.updateClearBtnState();
+
     this.area.focus();
   }
 }
