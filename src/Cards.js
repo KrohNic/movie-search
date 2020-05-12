@@ -9,14 +9,33 @@ class Cards {
     this.data = null;
     this.isCardContainerVisible = false;
 
-    this.firstCardsLoadedIndicatorList = [];
-
     this.parent.addEventListener('transitionend', (event) => {
       if (event.target !== this.parent) return;
       if (this.isCardContainerVisible) return;
 
       this.replaceCards();
     });
+  }
+
+  static prepareData(data) {
+    return data.map((movieData) => ({
+      data: movieData,
+      isFullyLoaded: false,
+      isRatingLoaded: false,
+      cardElement: null,
+    }));
+  }
+
+  static createRatingElements(parentElem, ratingStr) {
+    const parent = parentElem;
+
+    parent.textContent = '';
+
+    const img = Utils.createElem('img', 'rating--star', parentElem);
+    img.alt = 'rating imdb';
+    img.src = './assets/ico/star.svg';
+
+    Utils.createElem('div', 'rating--text', parentElem, ratingStr);
   }
 
   hideOldCardsRevealNew() {
@@ -31,75 +50,79 @@ class Cards {
 
   replaceCards() {
     this.parent.textContent = '';
-    this.createCards(this.data);
+    this.createCards();
 
     this.sliderInst.contentReplaceHandler();
   }
 
-  reveal(card, index) {
-    if (card.classList.contains('noimg')) return;
-    if (card.classList.contains('norating')) return;
-    if (!this.isCardContainerVisible) {
-      this.firstCardsLoadedIndicatorList[index] = true;
+  reveal(cardIndex) {
+    const cardData = this.data[cardIndex];
 
-      const isCardsFullyLoaded = this.firstCardsLoadedIndicatorList.every(
-        (item) => item,
-      );
+    if (!cardData.isPosterLoaded) return;
+    if (!cardData.isRatingLoaded) return;
 
-      if (isCardsFullyLoaded) this.revealCardsContainer();
+    cardData.cardElement.classList.remove('transparent');
+
+    if (this.isCardContainerVisible) return;
+
+    const first = this.sliderInst.firstCardIndex;
+    const last = first + this.sliderInst.getVisibleCardsCount();
+
+    let isCardsFullyLoaded = true;
+
+    for (let i = first; i < last; i += 1) {
+      const item = this.data[i];
+
+      if (!item) return;
+
+      if (!item.isPosterLoaded || !item.isRatingLoaded) {
+        isCardsFullyLoaded = false;
+      }
     }
 
-    card.classList.remove('transparent');
+    if (isCardsFullyLoaded) this.revealCardsContainer();
   }
 
-  createRatingElements(parentElem, rating, card, cardIndex) {
-    const parent = parentElem;
-
-    parent.textContent = '';
-
-    const img = Utils.createElem('img', 'rating--star', parentElem);
-    img.alt = 'rating imdb';
-    img.src = './assets/ico/star.svg';
-
-    Utils.createElem('div', 'rating--text', parentElem, rating);
-
-    card.classList.remove('norating');
-    this.reveal(card, cardIndex);
-  }
-
-  getImdbRating(id, parentElem, card, cardIndex) {
+  getImdbRating(id, parentElem, cardIndex) {
     const callback = (rating) => {
-      this.createRatingElements(parentElem, rating, card, cardIndex);
+      Cards.createRatingElements(parentElem, rating);
+      this.data[cardIndex].isRatingLoaded = true;
+      this.reveal(cardIndex);
     };
 
     Fetcher.fetchImdbRating(id, callback);
   }
 
-  loadPoster(card, imgContainer, data, cardIndex) {
+  setEmptyPoster(imgContainer, cardIndex) {
+    const container = imgContainer;
+
+    container.textContent = POSTER_NA;
+    this.data[cardIndex].isPosterLoaded = true;
+    this.reveal(cardIndex);
+  }
+
+  loadPoster(imgContainer, cardIndex) {
+    const { data } = this.data[cardIndex];
     const img = Utils.createElem('img', 'card--img', imgContainer);
+
     img.alt = data.Title;
     img.src = data.Poster;
 
     img.addEventListener('load', () => {
-      card.classList.remove('noimg');
-      this.reveal(card, cardIndex);
+      this.data[cardIndex].isPosterLoaded = true;
+      this.reveal(cardIndex);
     });
 
     img.addEventListener('error', () => {
-      this.setEmptyPoster(imgContainer, card, cardIndex);
+      this.setEmptyPoster(imgContainer, cardIndex);
     });
   }
 
-  setEmptyPoster(imgContainer, card, cardIndex) {
-    const container = imgContainer;
+  getNewCard(cardIndex) {
+    const { data } = this.data[cardIndex];
+    const card = Utils.createElem('div', 'card transparent');
 
-    container.textContent = POSTER_NA;
-    card.classList.remove('noimg');
-    this.reveal(card, cardIndex);
-  }
-
-  getNewCard(data, cardIndex) {
-    const card = Utils.createElem('div', 'card transparent noimg norating');
+    this.data[cardIndex].cardElement = card;
 
     const title = Utils.createElem('a', 'card--title', card, data.Title);
     title.title = data.Title;
@@ -108,26 +131,33 @@ class Cards {
     const imgContainer = Utils.createElem('div', 'card--img_container', card);
 
     if (data.Poster !== 'N/A') {
-      this.loadPoster(card, imgContainer, data, cardIndex);
+      this.loadPoster(imgContainer, cardIndex);
     } else {
-      this.setEmptyPoster(imgContainer, card, cardIndex);
+      this.setEmptyPoster(imgContainer, cardIndex);
     }
 
     Utils.createElem('div', 'card--year', card, data.Year);
 
-    const rating = Utils.createElem('div', 'card--rating', card, data.imdbId);
-    Utils.createLoadingPlaceholder(rating);
+    const ratingContainer = Utils.createElem(
+      'div',
+      'card--rating',
+      card,
+      data.imdbId,
+    );
+    Utils.createLoadingPlaceholder(ratingContainer);
 
-    this.getImdbRating(data.imdbID, rating, card, cardIndex);
+    this.getImdbRating(data.imdbID, ratingContainer, cardIndex);
 
     return card;
   }
 
-  createCards(data) {
+  createCards() {
     const fragment = new DocumentFragment();
 
-    data.forEach((movie, cardIndex) => {
-      const card = this.getNewCard(movie, cardIndex);
+    this.data.forEach((cardData, cardIndex) => {
+      if (cardData.cardElement) return;
+
+      const card = this.getNewCard(cardIndex);
       fragment.append(card);
     });
 
@@ -137,8 +167,7 @@ class Cards {
   setData(data) {
     if (!data) return;
 
-    this.data = data;
-    this.firstCardsLoadedIndicatorList = new Array(data.length).fill(false);
+    this.data = Cards.prepareData(data);
 
     if (this.parent.children.length) this.hideOldCardsRevealNew();
     else this.replaceCards();
@@ -147,9 +176,10 @@ class Cards {
   concatData(data) {
     if (!data) return;
 
-    this.data = this.data.concat(data);
+    const preparedData = Cards.prepareData(data);
 
-    this.createCards(data);
+    this.data = this.data.concat(preparedData);
+    this.createCards();
     this.sliderInst.contentAddHandler();
   }
 }
