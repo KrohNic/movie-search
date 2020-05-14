@@ -219,7 +219,6 @@ var Cards = /*#__PURE__*/function () {
     this.parent = parentElem;
     this.data = null;
     this.isCardContainerVisible = false;
-    this.firstCardsLoadedIndicatorList = [];
     this.parent.addEventListener('transitionend', function (event) {
       if (event.target !== _this.parent) return;
       if (_this.isCardContainerVisible) return;
@@ -244,102 +243,105 @@ var Cards = /*#__PURE__*/function () {
     key: "replaceCards",
     value: function replaceCards() {
       this.parent.textContent = '';
-      this.createCards(this.data);
+      this.createCards();
       this.sliderInst.contentReplaceHandler();
     }
   }, {
     key: "reveal",
-    value: function reveal(card, index) {
-      if (card.classList.contains('noimg')) return;
-      if (card.classList.contains('norating')) return;
+    value: function reveal(cardIndex) {
+      var cardData = this.data[cardIndex];
+      if (!cardData.isPosterLoaded) return;
+      if (!cardData.isRatingLoaded) return;
+      cardData.cardElement.classList.remove('transparent');
+      if (this.isCardContainerVisible) return;
+      var first = this.sliderInst.firstCardIndex;
+      var last = first + this.sliderInst.getVisibleCardsCount();
+      var isCardsFullyLoaded = true;
 
-      if (!this.isCardContainerVisible) {
-        this.firstCardsLoadedIndicatorList[index] = true;
-        var isCardsFullyLoaded = this.firstCardsLoadedIndicatorList.every(function (item) {
-          return item;
-        });
-        if (isCardsFullyLoaded) this.revealCardsContainer();
+      for (var i = first; i < last; i += 1) {
+        var item = this.data[i];
+        if (!item) return;
+
+        if (!item.isPosterLoaded || !item.isRatingLoaded) {
+          isCardsFullyLoaded = false;
+        }
       }
 
-      card.classList.remove('transparent');
-    }
-  }, {
-    key: "createRatingElements",
-    value: function createRatingElements(parentElem, rating, card, cardIndex) {
-      var parent = parentElem;
-      parent.textContent = '';
-      var img = Utils.createElem('img', 'rating--star', parentElem);
-      img.alt = 'rating imdb';
-      img.src = './assets/ico/star.svg';
-      Utils.createElem('div', 'rating--text', parentElem, rating);
-      card.classList.remove('norating');
-      this.reveal(card, cardIndex);
+      if (isCardsFullyLoaded) this.revealCardsContainer();
     }
   }, {
     key: "getImdbRating",
-    value: function getImdbRating(id, parentElem, card, cardIndex) {
+    value: function getImdbRating(id, parentElem, cardIndex) {
       var _this2 = this;
 
       var callback = function callback(rating) {
-        _this2.createRatingElements(parentElem, rating, card, cardIndex);
+        Cards.createRatingElements(parentElem, rating);
+        _this2.data[cardIndex].isRatingLoaded = true;
+
+        _this2.reveal(cardIndex);
       };
 
       Fetcher.fetchImdbRating(id, callback);
     }
   }, {
+    key: "setEmptyPoster",
+    value: function setEmptyPoster(imgContainer, cardIndex) {
+      var container = imgContainer;
+      container.textContent = POSTER_NA;
+      this.data[cardIndex].isPosterLoaded = true;
+      this.reveal(cardIndex);
+    }
+  }, {
     key: "loadPoster",
-    value: function loadPoster(card, imgContainer, data, cardIndex) {
+    value: function loadPoster(imgContainer, cardIndex) {
       var _this3 = this;
 
+      var data = this.data[cardIndex].data;
       var img = Utils.createElem('img', 'card--img', imgContainer);
       img.alt = data.Title;
       img.src = data.Poster;
       img.addEventListener('load', function () {
-        card.classList.remove('noimg');
+        _this3.data[cardIndex].isPosterLoaded = true;
 
-        _this3.reveal(card, cardIndex);
+        _this3.reveal(cardIndex);
       });
       img.addEventListener('error', function () {
-        _this3.setEmptyPoster(imgContainer, card, cardIndex);
+        _this3.setEmptyPoster(imgContainer, cardIndex);
       });
-    }
-  }, {
-    key: "setEmptyPoster",
-    value: function setEmptyPoster(imgContainer, card, cardIndex) {
-      var container = imgContainer;
-      container.textContent = POSTER_NA;
-      card.classList.remove('noimg');
-      this.reveal(card, cardIndex);
     }
   }, {
     key: "getNewCard",
-    value: function getNewCard(data, cardIndex) {
-      var card = Utils.createElem('div', 'card transparent noimg norating');
+    value: function getNewCard(cardIndex) {
+      var data = this.data[cardIndex].data;
+      var card = Utils.createElem('div', 'card transparent');
+      this.data[cardIndex].cardElement = card;
       var title = Utils.createElem('a', 'card--title', card, data.Title);
       title.title = data.Title;
       title.href = new URL("title/".concat(data.imdbID, "/videogallery/"), IMDB_URL);
       var imgContainer = Utils.createElem('div', 'card--img_container', card);
 
       if (data.Poster !== 'N/A') {
-        this.loadPoster(card, imgContainer, data, cardIndex);
+        this.loadPoster(imgContainer, cardIndex);
       } else {
-        this.setEmptyPoster(imgContainer, card, cardIndex);
+        this.setEmptyPoster(imgContainer, cardIndex);
       }
 
       Utils.createElem('div', 'card--year', card, data.Year);
-      var rating = Utils.createElem('div', 'card--rating', card, data.imdbId);
-      Utils.createLoadingPlaceholder(rating);
-      this.getImdbRating(data.imdbID, rating, card, cardIndex);
+      var ratingContainer = Utils.createElem('div', 'card--rating', card, data.imdbId);
+      Utils.createLoadingPlaceholder(ratingContainer);
+      this.getImdbRating(data.imdbID, ratingContainer, cardIndex);
       return card;
     }
   }, {
     key: "createCards",
-    value: function createCards(data) {
+    value: function createCards() {
       var _this4 = this;
 
       var fragment = new DocumentFragment();
-      data.forEach(function (movie, cardIndex) {
-        var card = _this4.getNewCard(movie, cardIndex);
+      this.data.forEach(function (cardData, cardIndex) {
+        if (cardData.cardElement) return;
+
+        var card = _this4.getNewCard(cardIndex);
 
         fragment.append(card);
       });
@@ -349,17 +351,39 @@ var Cards = /*#__PURE__*/function () {
     key: "setData",
     value: function setData(data) {
       if (!data) return;
-      this.data = data;
-      this.firstCardsLoadedIndicatorList = new Array(data.length).fill(false);
+      this.data = Cards.prepareData(data);
       if (this.parent.children.length) this.hideOldCardsRevealNew();else this.replaceCards();
     }
   }, {
     key: "concatData",
     value: function concatData(data) {
       if (!data) return;
-      this.data = this.data.concat(data);
-      this.createCards(data);
+      var preparedData = Cards.prepareData(data);
+      this.data = this.data.concat(preparedData);
+      this.createCards();
       this.sliderInst.contentAddHandler();
+    }
+  }], [{
+    key: "prepareData",
+    value: function prepareData(data) {
+      return data.map(function (movieData) {
+        return {
+          data: movieData,
+          isFullyLoaded: false,
+          isRatingLoaded: false,
+          cardElement: null
+        };
+      });
+    }
+  }, {
+    key: "createRatingElements",
+    value: function createRatingElements(parentElem, ratingStr) {
+      var parent = parentElem;
+      parent.textContent = '';
+      var img = Utils.createElem('img', 'rating--star', parentElem);
+      img.alt = 'rating imdb';
+      img.src = './assets/ico/star.svg';
+      Utils.createElem('div', 'rating--text', parentElem, ratingStr);
     }
   }]);
 
@@ -538,10 +562,54 @@ var Key = /*#__PURE__*/function () {
       return fragment;
     }
   }, {
+    key: "backspace",
+    value: function backspace() {
+      if (this.area.selectionStart === this.area.selectionEnd) {
+        if (this.area.selectionStart <= 0) return;
+        this.area.setRangeText('', this.area.selectionStart - 1, this.area.selectionStart, 'end');
+      } else {
+        this.printText('');
+      }
+    }
+  }, {
+    key: "printText",
+    value: function printText(text) {
+      this.area.setRangeText(text, this.area.selectionStart, this.area.selectionEnd, 'end');
+    }
+  }, {
+    key: "moveCursorLeft",
+    value: function moveCursorLeft(ShiftLeft) {
+      if (ShiftLeft.classList.contains('button_active')) {
+        if (this.area.selectionStart !== this.area.selectionEnd && this.area.selectionDirection === 'forward') {
+          this.area.setSelectionRange(this.area.selectionStart, this.area.selectionEnd - 1, 'forward');
+        } else if (this.area.selectionStart > 0) {
+          this.area.setSelectionRange(this.area.selectionStart - 1, this.area.selectionEnd, 'backward');
+        }
+      } else if (this.area.selectionStart === 0) {
+        this.area.setSelectionRange(this.area.selectionStart, this.area.selectionStart);
+      } else {
+        this.area.setSelectionRange(this.area.selectionStart - 1, this.area.selectionStart - 1);
+      }
+    }
+  }, {
+    key: "moveCursorRight",
+    value: function moveCursorRight(ShiftLeft) {
+      if (ShiftLeft.classList.contains('button_active')) {
+        if (this.area.selectionStart === this.area.selectionEnd || this.area.selectionDirection === 'forward') {
+          this.area.setSelectionRange(this.area.selectionStart, this.area.selectionEnd + 1, 'forward');
+        } else {
+          this.area.setSelectionRange(this.area.selectionStart + 1, this.area.selectionEnd, 'backward');
+        }
+      } else if (this.area.value.length === this.area.selectionEnd) {
+        this.area.setSelectionRange(this.area.selectionEnd, this.area.selectionEnd);
+      } else {
+        this.area.setSelectionRange(this.area.selectionEnd + 1, this.area.selectionEnd + 1);
+      }
+    }
+  }, {
     key: "repeatKey",
     value: function repeatKey(fn, keyValue) {
       var keyRepeatInterval = 175;
-      this.keyboardInst.cursorPosition = this.area.selectionStart;
       fn(keyValue);
       this.interval = setInterval(fn, keyRepeatInterval, keyValue);
     }
@@ -558,21 +626,17 @@ var Key = /*#__PURE__*/function () {
       switch (event.target.id) {
         case 'Backspace':
           this.repeatKey(function () {
-            if (_this2.keyboardInst.cursorPosition <= 0) return;
-
-            _this2.area.setRangeText('', _this2.keyboardInst.cursorPosition - 1, _this2.keyboardInst.cursorPosition, 'end');
+            _this2.backspace();
           });
           break;
 
         case 'Space':
-          this.repeatKey(function () {
-            _this2.area.setRangeText(' ', _this2.keyboardInst.cursorPosition, _this2.keyboardInst.cursorPosition, 'end');
-          });
+          this.printText(' ');
           break;
 
         case 'Tab':
           this.repeatKey(function () {
-            _this2.area.setRangeText('    ', _this2.keyboardInst.cursorPosition, _this2.keyboardInst.cursorPosition, 'end');
+            _this2.printText('    ');
           });
           break;
 
@@ -622,25 +686,19 @@ var Key = /*#__PURE__*/function () {
 
         case 'ArrowLeft':
           this.repeatKey(function () {
-            if (_this2.keyboardInst.cursorPosition <= 0) return;
-
-            _this2.area.setSelectionRange(_this2.keyboardInst.cursorPosition - 1, _this2.keyboardInst.cursorPosition - 1);
+            _this2.moveCursorLeft(ShiftLeft);
           });
           break;
 
         case 'ArrowRight':
           this.repeatKey(function () {
-            if (_this2.area.value.length <= _this2.keyboardInst.cursorPosition) {
-              return;
-            }
-
-            _this2.area.setSelectionRange(_this2.keyboardInst.cursorPosition + 1, _this2.keyboardInst.cursorPosition + 1);
+            _this2.moveCursorRight(ShiftLeft);
           });
           break;
 
         default:
           this.repeatKey(function (text) {
-            _this2.area.setRangeText(text, _this2.keyboardInst.cursorPosition, _this2.keyboardInst.cursorPosition, 'end');
+            _this2.printText(text);
           }, event.target.textContent);
           break;
       }
@@ -903,8 +961,8 @@ var KeyboardApp = /*#__PURE__*/function () {
     _classCallCheck(this, KeyboardApp);
 
     this.parentElem = parentElem;
-    this.clearBtn = document.querySelector('.search--clear_button');
-    this.area = document.querySelector('.search--input');
+    this.clearBtn = document.querySelector(".search--clear_button");
+    this.area = document.querySelector(".search--input");
     this.board = new Keyboard(this);
     this.init();
   }
@@ -912,8 +970,8 @@ var KeyboardApp = /*#__PURE__*/function () {
   _createClass(KeyboardApp, [{
     key: "init",
     value: function init() {
-      if (window.localStorage.getItem('lang')) {
-        this.board.isEngLang = window.localStorage.getItem('lang') === 'true';
+      if (window.localStorage.getItem("lang")) {
+        this.board.isEngLang = window.localStorage.getItem("lang") === "true";
       }
 
       this.generateElements(this.parentElem);
@@ -922,9 +980,9 @@ var KeyboardApp = /*#__PURE__*/function () {
   }, {
     key: "generateElements",
     value: function generateElements(wrapper) {
-      var keyboard = document.createElement('div');
-      keyboard.classList.add('keyboard');
-      keyboard.id = 'keyboard';
+      var keyboard = document.createElement("div");
+      keyboard.classList.add("keyboard");
+      keyboard.id = "keyboard";
       wrapper.append(keyboard);
 
       for (var i = 0; i < this.board.symbols.length; i += 1) {
@@ -938,15 +996,14 @@ var KeyboardApp = /*#__PURE__*/function () {
     value: function setHandlers() {
       var _this = this;
 
-      var keyboardBtn = document.querySelector('.search--keyboard_button');
-      keyboardBtn.addEventListener('click', function () {
-        _this.parentElem.classList.toggle('keyboard--container-hidden');
+      var keyboardBtn = document.querySelector(".search--keyboard_button");
+      keyboardBtn.addEventListener("click", function () {
+        _this.parentElem.classList.toggle("keyboard--container-hidden");
       });
-      this.clearBtn.addEventListener('click', function () {
-        _this.area.value = '';
-        _this.board.cursorPosition = 0;
+      this.clearBtn.addEventListener("click", function () {
+        _this.area.value = "";
 
-        _this.clearBtn.classList.add('hidden');
+        _this.clearBtn.classList.add("hidden");
 
         _this.area.focus();
       });
@@ -954,13 +1011,13 @@ var KeyboardApp = /*#__PURE__*/function () {
   }, {
     key: "updateClearBtnState",
     value: function updateClearBtnState() {
-      if (this.area.value.length) this.clearBtn.classList.remove('hidden');else this.clearBtn.classList.add('hidden');
+      if (this.area.value.length) this.clearBtn.classList.remove("hidden");else this.clearBtn.classList.add("hidden");
     }
   }, {
     key: "createKeysRow",
     value: function createKeysRow(row, keyboard) {
-      var div = document.createElement('div');
-      div.classList.add('key-row');
+      var div = document.createElement("div");
+      div.classList.add("key-row");
       keyboard.append(div);
       var fragment = new DocumentFragment();
 
@@ -1167,6 +1224,20 @@ var Slider = /*#__PURE__*/function () {
       this.appInst.loadNextPage();
     }
   }, {
+    key: "fillContainerFreeSpace",
+    value: function fillContainerFreeSpace() {
+      if (this.sliderContentWidth >= this.cardsContainerWidth) {
+        this.firstCardIndex = 0;
+      } else if (this.firstCardIndex > 0) {
+        var cardsWithoutSlided = this.loadedCardsCount - this.firstCardIndex;
+        var mustBeVisibleCount = this.getVisibleCardsCount();
+
+        if (cardsWithoutSlided < mustBeVisibleCount) {
+          this.firstCardIndex -= 1;
+        }
+      }
+    }
+  }, {
     key: "updateSizes",
     value: function updateSizes() {
       var someCard = document.querySelector('.card');
@@ -1175,16 +1246,17 @@ var Slider = /*#__PURE__*/function () {
       this.sliderContentWidth = sliderContent.getBoundingClientRect().width;
       var cardsCount = this.cardsContainer.children.length;
       this.cardsContainerWidth = this.cardWidth * cardsCount;
-
-      if (this.sliderContentWidth >= this.cardsContainerWidth) {
-        this.firstCardIndex = 0;
-      } else if (this.firstCardIndex) {
-        var notHidedLeft = this.loadedCardsCount - this.firstCardIndex;
-        var freeSpace = this.sliderContentWidth - notHidedLeft * this.cardWidth;
-        if (freeSpace > this.cardWidth / 2) this.firstCardIndex -= 1;
+      this.fillContainerFreeSpace();
+      this.setContentOffset(this.firstCardIndex * this.cardWidth);
+    }
+  }, {
+    key: "getVisibleCardsCount",
+    value: function getVisibleCardsCount() {
+      if (this.sliderContentWidth < this.cardsContainerWidth) {
+        return Math.floor(this.sliderContentWidth / this.cardWidth);
       }
 
-      this.setContentOffset(this.firstCardIndex * this.cardWidth);
+      return this.cardsContainerWidth / this.cardWidth;
     }
   }, {
     key: "contentReplaceHandler",
@@ -1224,11 +1296,11 @@ var Slider = /*#__PURE__*/function () {
     value: function mouseUpHandler() {
       if (!this.isMouseDown) return;
       this.isMouseDown = false;
-      this.alignCards();
+      this.removeContainerFreeSpace();
     }
   }, {
-    key: "alignCards",
-    value: function alignCards() {
+    key: "removeContainerFreeSpace",
+    value: function removeContainerFreeSpace() {
       var hiddenCardPartWidth = this.contentOffset % this.cardWidth;
       this.firstCardIndex = Math.round(this.contentOffset / this.cardWidth);
 
@@ -1502,8 +1574,12 @@ var _require = __webpack_require__(/*! ./values */ "./src/values.js"),
 document.body.onload = function () {
   var app = new App();
   app.loadNewCards(DEFAULT_SEARCH_STR); // eslint-disable-next-line no-alert
-
-  window.alert('Доп. функция - Голосовой поиск (кнопка микрофона в строке ' + 'поиска)\nПри ожидании ответа от сервера присутствует индикация ' + 'процесса загрузки - появляется в строке поиска на месте лупы\n' + 'По вопросам пишите - mikolka.del@gmail.com');
+  // window.alert(
+  //   'Доп. функция - Голосовой поиск (кнопка микрофона в строке '
+  //     + 'поиска)\nПри ожидании ответа от сервера присутствует индикация '
+  //     + 'процесса загрузки - появляется в строке поиска на месте лупы\n'
+  //     + 'По вопросам пишите - mikolka.del@gmail.com',
+  // );
 };
 
 /***/ }),

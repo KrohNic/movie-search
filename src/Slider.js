@@ -86,6 +86,19 @@ class Slider {
     this.appInst.loadNextPage();
   }
 
+  fillContainerFreeSpace() {
+    if (this.sliderContentWidth >= this.cardsContainerWidth) {
+      this.firstCardIndex = 0;
+    } else if (this.firstCardIndex > 0) {
+      const cardsWithoutSlided = this.loadedCardsCount - this.firstCardIndex;
+      const mustBeVisibleCount = this.getVisibleCardsCount();
+
+      if (cardsWithoutSlided < mustBeVisibleCount) {
+        this.firstCardIndex -= 1;
+      }
+    }
+  }
+
   updateSizes() {
     const someCard = document.querySelector('.card');
 
@@ -98,16 +111,17 @@ class Slider {
     const cardsCount = this.cardsContainer.children.length;
     this.cardsContainerWidth = this.cardWidth * cardsCount;
 
-    if (this.sliderContentWidth >= this.cardsContainerWidth) {
-      this.firstCardIndex = 0;
-    } else if (this.firstCardIndex) {
-      const notHidedLeft = this.loadedCardsCount - this.firstCardIndex;
-      const freeSpace = this.sliderContentWidth - notHidedLeft * this.cardWidth;
-
-      if (freeSpace > this.cardWidth / 2) this.firstCardIndex -= 1;
-    }
+    this.fillContainerFreeSpace();
 
     this.setContentOffset(this.firstCardIndex * this.cardWidth);
+  }
+
+  getVisibleCardsCount() {
+    if (this.sliderContentWidth < this.cardsContainerWidth) {
+      return Math.floor(this.sliderContentWidth / this.cardWidth);
+    }
+
+    return this.cardsContainerWidth / this.cardWidth;
   }
 
   contentReplaceHandler() {
@@ -149,10 +163,10 @@ class Slider {
 
     this.isMouseDown = false;
 
-    this.alignCards();
+    this.removeContainerFreeSpace();
   }
 
-  alignCards() {
+  removeContainerFreeSpace() {
     const hiddenCardPartWidth = this.contentOffset % this.cardWidth;
     this.firstCardIndex = Math.round(this.contentOffset / this.cardWidth);
 
